@@ -46,7 +46,7 @@ EXEMPLES = [
         peb_score=210,
         garage=True,
         statut=Statut.VISITE_PREVUE,
-        telephone_agence="02 123 45 67",
+        telephone_agence="02 000 00 01",  # plage non attribuée : donnée d'exemple
         description_brute=(
             "Belle maison familiale de 168 m², quatre chambres, jardin orienté sud, "
             "garage. Toiture refaite en 2019, châssis double vitrage, chaudière à "
@@ -80,7 +80,7 @@ EXEMPLES = [
         garage=False,
         garage_potentiel=True,
         statut=Statut.A_APPELER,
-        telephone_agence="02 731 00 00",
+        telephone_agence="02 000 00 02",  # plage non attribuée : donnée d'exemple
         description_brute=(
             "Maison de caractère à rafraîchir, 185 m² habitables, quatre chambres, "
             "grand jardin. Toiture à isoler, châssis d'origine à l'arrière. "
