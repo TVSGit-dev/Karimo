@@ -1,0 +1,206 @@
+{% extends "base.html" %}
+{% set b = f.bien %}
+{% block titre %}{{ b.commune }} — {{ f.cout.prix_cents | string }}{% endblock %}
+
+{% block contenu %}
+<div class="entete-ecran">
+  <div>
+    <h1>{{ b.commune }}</h1>
+    <p class="sous-titre">
+      {{ b.adresse or 'Adresse non renseignée' }} · {{ b.source }}
+      {% if b.arret_proche %} · {{ b.arret_proche }}, {{ b.minutes_marche }} min à pied{% endif %}
+    </p>
+  </div>
+  <a class="bouton-compact" href="/bien/{{ b.id }}/modifier">Modifier</a>
+</div>
+
+{# --- Alertes : ce qu'il faut voir avant tout le reste --- #}
+{% if f.qualification.signaux %}
+<section class="alertes">
+  {% for s in f.qualification.exclusions %}
+    <p class="alerte exclusion"><strong>Filtre :</strong> {{ s.message }}</p>
+  {% endfor %}
+  {% for s in f.qualification.alertes %}
+    <p class="alerte"><strong>Alerte :</strong> {{ s.message }}</p>
+  {% endfor %}
+  {% if f.qualification.indices_travaux %}
+    <details class="alerte">
+      <summary>Extraits de l'annonce autour des mots-clés</summary>
+      <ul>
+        {% for i in f.qualification.indices_travaux %}
+          <li><strong>{{ i.mot_cle }}</strong> — « {{ i.extrait }} »</li>
+        {% endfor %}
+      </ul>
+    </details>
+  {% endif %}
+</section>
+{% endif %}
+
+{# --- Le calcul financier, poste par poste --- #}
+<section class="bloc">
+  <h2>Coût réel</h2>
+  <table class="calcul">
+    <tbody>
+      <tr><th>Prix affiché</th><td>{{ formate_euros(f.cout.prix_cents) }}</td></tr>
+      <tr>
+        <th>Droits d'enregistrement
+          <small>{{ 'Flandre, 2 %' if b.region == 'flandre' else 'Bruxelles, 12,5 % après abattement' }}</small>
+        </th>
+        <td>{{ formate_euros(f.cout.droits_cents) }}</td>
+      </tr>
+      <tr>
+        <th>Honoraires du notaire <small>hors TVA</small></th>
+        <td>{{ formate_euros(f.cout.honoraires_ht_cents, decimales=True) }}</td>
+      </tr>
+      {% if f.cout.tva_honoraires_cents %}
+      <tr><th>TVA sur honoraires <small>21 %</small></th>
+        <td>{{ formate_euros(f.cout.tva_honoraires_cents, decimales=True) }}</td></tr>
+      {% endif %}
+      <tr><th>Débours et frais d'acte</th><td>{{ formate_euros(f.cout.debours_cents) }}</td></tr>
+      <tr class="sous-total"><th>Frais d'achat</th>
+        <td>{{ formate_euros(f.cout.frais_achat_cents) }}</td></tr>
+      <tr><th>Emprunt <small>prix + frais − apport</small></th>
+        <td>{{ formate_euros(f.cout.emprunt_cents) }}</td></tr>
+      <tr><th>Frais de crédit</th><td>{{ formate_euros(f.cout.frais_credit_cents) }}</td></tr>
+      <tr class="total"><th>Coût total</th>
+        <td>{{ formate_euros(f.cout.cout_total_cents) }}</td></tr>
+      <tr class="mise-en-avant"><th>Mensualité <small>{{ taux_annuel }} sur {{ duree_annees }} ans</small></th>
+        <td>{{ formate_euros(f.cout.mensualite_cents) }}</td></tr>
+      <tr class="{{ 'ligne-verte' if f.cout.sous_plafond else 'ligne-rouge' }}">
+        <th>Écart au plafond <small>{{ plafond }}</small></th>
+        <td>
+          {{ '+' if f.cout.sous_plafond else '−' }}{{ formate_euros(f.cout.ecart_plafond_cents | abs) }}
+        </td>
+      </tr>
+    </tbody>
+  </table>
+
+  {% if not f.cout.sous_plafond %}
+    <p class="conseil">
+      Pour tenir sous {{ plafond }} tous frais compris, il faut négocier à
+      <strong>{{ f.prix_cible }}</strong> ou moins.
+    </p>
+  {% endif %}
+
+  {% if f.lignes_honoraires %}
+  <details class="detail-bareme">
+    <summary>Détail des honoraires, tranche par tranche</summary>
+    <table class="calcul petit">
+      <thead><tr><th>Tranche</th><th>Taux</th><th>Honoraires</th></tr></thead>
+      <tbody>
+        {% for assiette, taux, montant in f.lignes_honoraires %}
+          <tr><td>{{ assiette }}</td><td>{{ taux }}</td><td>{{ montant }}</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    <p class="note-bas">
+      Barème légal de l'arrêté royal du 16 décembre 1950, identique chez tous les
+      notaires. À confronter à un devis réel : le barème a été modifié début 2026.
+    </p>
+  </details>
+  {% endif %}
+</section>
+
+{# --- Rappel des conditions du taux flamand (SPEC 4.2) --- #}
+{% if b.region == 'flandre' %}
+<section class="bloc rappel">
+  <h2>{{ titre_conditions }}</h2>
+  <ul class="conditions">
+    {% for condition in conditions_flamandes %}<li>{{ condition }}</li>{% endfor %}
+  </ul>
+</section>
+{% endif %}
+
+{# --- La grille de notation, utilisable au doigt --- #}
+<section class="bloc" id="grille">
+  <h2>
+    Notation
+    <span class="score">
+      {% if f.score.pourcentage is none %}
+        non notée
+      {% else %}
+        {{ f.score.obtenu }}/{{ f.score.maximum }} · {{ formate_pourcentage(f.score.pourcentage) }}
+        {% if f.score.verdict %}<em>{{ f.score.verdict.libelle }}</em>{% endif %}
+      {% endif %}
+    </span>
+  </h2>
+
+  {% if f.score.partielle and f.score.criteres_notes %}
+    <p class="avertissement">
+      Notation partielle : {{ f.score.criteres_notes }} critère(s) sur 11.
+      Le score est calculé sur le maximum des seuls critères renseignés.
+    </p>
+  {% endif %}
+
+  <div class="grille">
+    {% for critere, libelle, poids, note in f.criteres %}
+    <div class="ligne-grille">
+      <div class="libelle-critere">{{ libelle }} <span class="poids">×{{ poids }}</span></div>
+      <form method="post" action="/bien/{{ b.id }}/note" class="boutons-note">
+        <input type="hidden" name="critere" value="{{ critere.value }}">
+        {% for n in range(note_min, note_max + 1) %}
+          <button type="submit" name="note" value="{{ n }}"
+                  class="bouton-note {{ 'choisi' if note == n }}"
+                  aria-label="{{ libelle }} : {{ n }} sur {{ note_max }}">{{ n }}</button>
+        {% endfor %}
+      </form>
+    </div>
+    {% endfor %}
+  </div>
+  <p class="note-bas">Retaper la note déjà choisie l'efface.</p>
+</section>
+
+{# --- Notes libres --- #}
+<section class="bloc" id="notes">
+  <h2>Notes</h2>
+  <form method="post" action="/bien/{{ b.id }}/notes-libres">
+    <textarea name="notes_libres" rows="4"
+              placeholder="Ce qu'on a vu, ce qu'il faut redemander…">{{ b.notes_libres or '' }}</textarea>
+    <button type="submit" class="bouton">Enregistrer</button>
+  </form>
+</section>
+
+{# --- Statut et suivi --- #}
+<section class="bloc">
+  <h2>Suivi</h2>
+  <form method="post" action="/bien/{{ b.id }}/statut" class="ligne-formulaire">
+    <select name="statut" aria-label="Statut">
+      {% for s in Statut %}
+        <option value="{{ s.value }}" {{ 'selected' if b.statut == s.value }}>{{ s.libelle }}</option>
+      {% endfor %}
+    </select>
+    <input type="text" name="raison_ecart" placeholder="Raison si écarté"
+           value="{{ b.raison_ecart or '' }}">
+    <button type="submit" class="bouton">Enregistrer</button>
+  </form>
+
+  <dl class="metadonnees">
+    <dt>Première vue</dt><dd>{{ b.premiere_vue.strftime('%d/%m/%Y') }}</dd>
+    <dt>Dernière vue</dt><dd>{{ b.derniere_vue.strftime('%d/%m/%Y') }}</dd>
+    <dt>Prix initial</dt><dd>{{ formate_euros(b.prix_initial_cents) }}</dd>
+    {% if b.telephone_agence %}
+      <dt>Agence</dt><dd><a href="tel:{{ b.telephone_agence }}">{{ b.telephone_agence }}</a></dd>
+    {% endif %}
+    {% if b.peb_score %}<dt>PEB</dt><dd>{{ b.peb_score }} kWh/m²/an</dd>{% endif %}
+    {% if b.peb_cause %}<dt>Cause PEB</dt><dd>{{ b.peb_cause }}</dd>{% endif %}
+  </dl>
+
+  {% if b.historique|length > 1 %}
+  <h3>Historique de prix</h3>
+  <ul class="historique">
+    {% for h in b.historique %}
+      <li>{{ h.date.strftime('%d/%m/%Y') }} — {{ formate_euros(h.prix_cents) }}</li>
+    {% endfor %}
+  </ul>
+  {% endif %}
+
+  {% if b.url %}<p><a class="bouton" href="{{ b.url }}" target="_blank" rel="noopener">Ouvrir l'annonce</a></p>{% endif %}
+</section>
+
+{% if b.description_brute %}
+<section class="bloc">
+  <h2>Description</h2>
+  <p class="description">{{ b.description_brute }}</p>
+</section>
+{% endif %}
+{% endblock %}

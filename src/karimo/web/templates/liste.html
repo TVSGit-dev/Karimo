@@ -1,0 +1,87 @@
+{% extends "base.html" %}
+{% set page = 'liste' %}
+{% block titre %}Biens — Karimo{% endblock %}
+
+{% block contenu %}
+<div class="entete-ecran">
+  <h1>Biens <span class="compteur">{{ lignes|length }}</span></h1>
+</div>
+
+<form class="filtres" method="get" action="/">
+  <div class="groupe-filtre">
+    <label for="tri">Trier par</label>
+    <select id="tri" name="tri" onchange="this.form.submit()">
+      {% for cle, libelle in tris.items() %}
+        <option value="{{ cle }}" {{ 'selected' if tri_actif == cle }}>{{ libelle }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  <div class="groupe-filtre">
+    <label for="statut">Statut</label>
+    <select id="statut" name="statut" onchange="this.form.submit()">
+      <option value="">Tous ({{ total }})</option>
+      {% for s in Statut %}
+        <option value="{{ s.value }}" {{ 'selected' if statut_actif == s }}>
+          {{ s.libelle }} ({{ comptes[s] }})
+        </option>
+      {% endfor %}
+    </select>
+  </div>
+</form>
+
+{% if not lignes %}
+  <p class="vide">Aucun bien. <a href="/bien/nouveau">Ajouter le premier</a>.</p>
+{% else %}
+<ul class="liste-biens">
+  {% for l in lignes %}
+  <li class="carte statut-{{ l.bien.statut }}">
+    <a href="/bien/{{ l.bien.id }}">
+      <div class="carte-tete">
+        <span class="commune">{{ l.bien.commune }}</span>
+        <span class="etiquette region-{{ l.bien.region }}">
+          {{ 'Flandre' if l.bien.region == 'flandre' else 'Bruxelles' }}
+        </span>
+        {% if l.bien.a_baisse %}
+          <span class="etiquette baisse" title="Baisse depuis la première vue">
+            ▼ {{ l.baisse }}
+          </span>
+        {% endif %}
+      </div>
+
+      <div class="carte-chiffres">
+        <div class="chiffre">
+          <span class="etiquette-chiffre">Prix</span>
+          <strong>{{ l.prix }}</strong>
+        </div>
+        <div class="chiffre">
+          <span class="etiquette-chiffre">Coût total</span>
+          <strong>{{ l.cout_total }}</strong>
+        </div>
+        <div class="chiffre">
+          <span class="etiquette-chiffre">
+            {{ 'Sous plafond' if l.cout.sous_plafond else 'Dépassement' }}
+          </span>
+          <strong class="{{ 'vert' if l.cout.sous_plafond else 'rouge' }}">
+            {{ '+' if l.cout.sous_plafond else '−' }}{{ l.ecart_plafond }}
+          </strong>
+        </div>
+      </div>
+
+      <div class="carte-pied">
+        <span class="jeton peb-{{ l.bien.peb_label or 'inconnu' }}">
+          PEB {{ l.bien.peb_label or '?' }}
+        </span>
+        <span class="jeton">Note {{ l.note_affichee }}</span>
+        <span class="jeton statut">{{ Statut(l.bien.statut).libelle }}</span>
+        {% if l.bien.chambres %}<span class="jeton">{{ l.bien.chambres }} ch.</span>{% endif %}
+        {% if l.bien.surface_habitable %}
+          <span class="jeton">{{ l.bien.surface_habitable }} m²</span>
+        {% endif %}
+      </div>
+    </a>
+  </li>
+  {% endfor %}
+</ul>
+<p class="note-bas">Une note suivie de <strong>*</strong> est partielle : tous les critères ne sont pas renseignés.</p>
+{% endif %}
+{% endblock %}
