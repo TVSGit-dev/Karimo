@@ -1,0 +1,155 @@
+{% extends "base.html" %}
+{% block titre %}{{ 'Modifier' if bien else 'Ajouter un bien' }} — Karimo{% endblock %}
+
+{% block contenu %}
+<div class="entete-ecran"><h1>{{ 'Modifier le bien' if bien else 'Ajouter un bien' }}</h1></div>
+
+<form method="post" action="/bien" class="formulaire">
+  {% if bien %}<input type="hidden" name="bien_id" value="{{ bien.id }}">{% endif %}
+
+  <fieldset>
+    <legend>Identification</legend>
+    <label>Source <span class="requis">*</span>
+      <input type="text" name="source" required placeholder="Immoweb, Casalina…"
+             value="{{ bien.source if bien else '' }}">
+    </label>
+    <label>Lien de l'annonce
+      <input type="url" name="url" value="{{ bien.url or '' if bien else '' }}">
+    </label>
+    <label>Adresse
+      <input type="text" name="adresse" value="{{ bien.adresse or '' if bien else '' }}">
+    </label>
+    <div class="paire">
+      <label>Commune <span class="requis">*</span>
+        <input type="text" name="commune" required list="communes"
+               value="{{ bien.commune if bien else '' }}">
+        <datalist id="communes">
+          <option value="Kraainem"><option value="Wezembeek-Oppem">
+          <option value="Woluwe-Saint-Pierre"><option value="Woluwe-Saint-Étienne">
+          <option value="Sterrebeek">
+        </datalist>
+      </label>
+      <label>Région fiscale <span class="requis">*</span>
+        <select name="region" required>
+          {% for r in Region %}
+            <option value="{{ r.value }}" {{ 'selected' if bien and bien.region == r.value }}>
+              {{ r.libelle }}
+            </option>
+          {% endfor %}
+        </select>
+      </label>
+    </div>
+  </fieldset>
+
+  <fieldset>
+    <legend>Caractéristiques</legend>
+    <div class="paire">
+      <label>Prix (€) <span class="requis">*</span>
+        <input type="text" inputmode="decimal" name="prix" required placeholder="450000"
+               value="{{ (bien.prix_cents / 100) | round | int if bien else '' }}">
+      </label>
+      <label>Chambres
+        <input type="number" name="chambres" min="0"
+               value="{{ bien.chambres if bien and bien.chambres is not none else '' }}">
+      </label>
+    </div>
+    <div class="paire">
+      <label>Surface habitable (m²)
+        <input type="number" name="surface_habitable" min="0"
+               value="{{ bien.surface_habitable if bien and bien.surface_habitable is not none else '' }}">
+      </label>
+      <label>Terrain (m²)
+        <input type="number" name="surface_terrain" min="0"
+               value="{{ bien.surface_terrain if bien and bien.surface_terrain is not none else '' }}">
+      </label>
+    </div>
+    <div class="paire">
+      <label class="case">
+        <input type="checkbox" name="garage" value="1" {{ 'checked' if bien and bien.garage }}> Garage
+      </label>
+      <label class="case">
+        <input type="checkbox" name="garage_potentiel" value="1"
+               {{ 'checked' if bien and bien.garage_potentiel }}> Garage possible
+      </label>
+    </div>
+  </fieldset>
+
+  <fieldset>
+    <legend>PEB</legend>
+    <div class="paire">
+      <label>Label
+        <select name="peb_label">
+          <option value="">Inconnu</option>
+          {% for l in LabelPeb %}
+            <option value="{{ l.value }}" {{ 'selected' if bien and bien.peb_label == l.value }}>
+              {{ l.value }}
+            </option>
+          {% endfor %}
+        </select>
+      </label>
+      <label>Score (kWh/m²/an)
+        <input type="number" name="peb_score" min="0"
+               value="{{ bien.peb_score if bien and bien.peb_score is not none else '' }}">
+      </label>
+    </div>
+    <label>Cause du label
+      <input type="text" name="peb_cause" placeholder="toiture non isolée, simple vitrage…"
+             value="{{ bien.peb_cause or '' if bien else '' }}">
+      <small>C'est la cause qui décide, pas la lettre.</small>
+    </label>
+  </fieldset>
+
+  <fieldset>
+    <legend>Situation</legend>
+    <div class="paire">
+      <label>Latitude
+        <input type="text" inputmode="decimal" name="latitude" placeholder="50.8430"
+               value="{{ bien.latitude if bien and bien.latitude is not none else '' }}">
+      </label>
+      <label>Longitude
+        <input type="text" inputmode="decimal" name="longitude" placeholder="4.4880"
+               value="{{ bien.longitude if bien and bien.longitude is not none else '' }}">
+      </label>
+    </div>
+    <label>Minutes à pied d'un arrêt
+      <input type="number" name="minutes_marche" min="0"
+             value="{{ bien.minutes_marche if bien and bien.minutes_marche is not none else '' }}">
+      <small>Calculé automatiquement si les coordonnées sont renseignées.</small>
+    </label>
+  </fieldset>
+
+  <fieldset>
+    <legend>Suivi</legend>
+    <div class="paire">
+      <label>Statut
+        <select name="statut">
+          {% for s in Statut %}
+            <option value="{{ s.value }}" {{ 'selected' if bien and bien.statut == s.value }}>
+              {{ s.libelle }}
+            </option>
+          {% endfor %}
+        </select>
+      </label>
+      <label>Téléphone de l'agence
+        <input type="tel" name="telephone_agence"
+               value="{{ bien.telephone_agence or '' if bien else '' }}">
+      </label>
+    </div>
+    <label>Raison si écarté
+      <input type="text" name="raison_ecart" value="{{ bien.raison_ecart or '' if bien else '' }}">
+    </label>
+    <label>Description de l'annonce
+      <textarea name="description_brute" rows="5"
+                placeholder="Coller le texte de l'annonce : les mots-clés de gros travaux y seront cherchés.">{{ bien.description_brute or '' if bien else '' }}</textarea>
+    </label>
+    <label>Notes
+      <textarea name="notes_libres" rows="3">{{ bien.notes_libres or '' if bien else '' }}</textarea>
+    </label>
+  </fieldset>
+
+  <div class="actions">
+    <button type="submit" class="bouton principal">Enregistrer</button>
+    <a class="bouton secondaire" href="{{ '/bien/' ~ bien.id if bien else '/' }}">Annuler</a>
+  </div>
+</form>
+{% endblock %}

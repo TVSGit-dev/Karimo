@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% set page = 'journal' %}
+{% block titre %}Journal — Karimo{% endblock %}
+
+{% block contenu %}
+<div class="entete-ecran"><h1>Journal d'exécution</h1></div>
+
+{% if not executions %}
+  <p class="vide">
+    Aucune exécution enregistrée. Les sources automatiques arrivent au jalon 2 ;
+    cet écran existe déjà pour qu'une source en panne ne passe pas inaperçue.
+  </p>
+{% else %}
+<div class="tableau-defilant">
+  <table class="journal">
+    <thead>
+      <tr><th>Date</th><th>Source</th><th>Vues</th><th>Retenues</th><th>Erreurs</th></tr>
+    </thead>
+    <tbody>
+      {% for e in executions %}
+      <tr class="{{ 'en-erreur' if e.en_erreur }}">
+        <td>{{ e.date.strftime('%d/%m/%Y %H:%M') }}</td>
+        <td>{{ e.source }}</td>
+        <td>{{ e.annonces_vues }}</td>
+        <td>{{ e.annonces_retenues }}</td>
+        <td>{{ e.erreurs or '—' }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+{% endblock %}

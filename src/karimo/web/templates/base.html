@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>{% block titre %}Karimo{% endblock %}</title>
+  <link rel="stylesheet" href="/static/karimo.css">
+</head>
+<body>
+  <header class="barre">
+    <a class="marque" href="/">Karimo</a>
+    <nav>
+      <a href="/" class="{{ 'actif' if page == 'liste' }}">Biens</a>
+      <a href="/journal" class="{{ 'actif' if page == 'journal' }}">Journal</a>
+      <a href="/bien/nouveau" class="bouton-compact">+ Ajouter</a>
+    </nav>
+  </header>
+
+  <main>
+    {% block contenu %}{% endblock %}
+  </main>
+
+  <footer>
+    <p>
+      Plafond {{ plafond }} · apport {{ apport }} · {{ taux_annuel }} sur {{ duree_annees }} ans
+      {% if mode_approximation %}· <strong>honoraires en mode approximation</strong>{% endif %}
+    </p>
+  </footer>
+</body>
+</html>
