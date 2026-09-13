@@ -78,6 +78,9 @@ h3 { font-size: 15px; margin: 20px 0 8px; }
 }
 .bouton.principal { background: var(--accent); border-color: var(--accent); color: #fff; }
 .bouton.secondaire { background: transparent; }
+.actions-fiche { display: flex; gap: 6px; flex-shrink: 0; }
+.bouton-compact.secondaire { background: transparent; border-color: var(--trait);
+                             color: var(--encre); }
 .bouton-compact {
   display: inline-flex; align-items: center; min-height: 36px;
   padding: 0 12px; border-radius: 8px; text-decoration: none;
@@ -166,6 +169,7 @@ textarea { min-height: 80px; resize: vertical; }
 /* --- Grille de notation : la partie qui se remplit au doigt --- */
 .score { font-size: 14px; font-weight: 400; color: var(--encre-douce); }
 .score em { font-style: normal; font-weight: 700; color: var(--accent); }
+.avertissement[hidden] { display: none; }
 .avertissement { margin: 0 0 12px; padding: 10px 12px; border-radius: 8px;
                  background: var(--ambre-fond); font-size: 13px; color: #5a3c00; }
 
@@ -185,13 +189,18 @@ textarea { min-height: 80px; resize: vertical; }
   -webkit-tap-highlight-color: transparent;
 }
 .bouton-note.choisi { background: var(--accent); border-color: var(--accent); color: #fff; }
+.boutons-note.en-cours { opacity: .6; pointer-events: none; }
 
 /* Ecrans etroits : la grille passe sur deux lignes pour garder des cibles pleines. */
 @media (max-width: 480px) {
   .ligne-grille { flex-direction: column; align-items: stretch; gap: 6px; }
   .boutons-note { justify-content: space-between; }
   .bouton-note { flex: 1; }
-  .carte-chiffres { grid-template-columns: 1fr 1fr; }
+  /* Les trois chiffres restent cote a cote : la carte tient sur moins de
+     hauteur, et on voit plus de biens sans defiler. */
+  .carte-chiffres { gap: 6px; }
+  .etiquette-chiffre { font-size: 10px; letter-spacing: 0; }
+  .chiffre strong { font-size: 14px; }
 }
 
 /* --- Formulaire --- */

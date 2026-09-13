@@ -4,8 +4,8 @@ from __future__ import annotations
 
 from datetime import date
 
-from fastapi import APIRouter, Depends, Form, HTTPException, Request
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi import APIRouter, Depends, Form, HTTPException, Request, Response
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from sqlalchemy.orm import Session
 
 from karimo.db.models import Bien, Statut, hacher_url
@@ -16,6 +16,7 @@ from karimo.db.repository import (
     lister_biens,
     noter,
     obtenir_bien,
+    score_du_bien,
 )
 from karimo.db.session import obtenir_session
 from karimo.domain.conditions import CONDITIONS_TAUX_FLAMAND, TITRE_TAUX_FLAMAND
@@ -25,7 +26,7 @@ from karimo.domain.peb import LabelPeb
 from karimo.domain.perimetre import arret_le_plus_proche
 from karimo.money import euros
 from karimo.web.app import GABARITS
-from karimo.web.vues import contexte_commun, fiche, ligne
+from karimo.web.vues import contexte_commun, fiche, ligne, resume_score
 
 routeur = APIRouter()
 
@@ -199,12 +200,18 @@ def enregistrer(
 
 @routeur.post("/bien/{bien_id}/note")
 def poser_note(
+    request: Request,
     bien_id: int,
     critere: str = Form(...),
     note: str = Form(...),
     session: Session = Depends(obtenir_session),
-) -> RedirectResponse:
-    """Enregistre un tap sur la grille. Retaper la meme note l'efface."""
+) -> Response:
+    """Enregistre un tap sur la grille. Retaper la meme note l'efface.
+
+    Repond en JSON quand le client le demande, en redirection sinon : la grille
+    se remplit debout dans une maison, et onze rechargements de page a la suite
+    seraient penibles. Le formulaire reste fonctionnel sans JavaScript.
+    """
     bien = obtenir_bien(session, bien_id)
     if bien is None:
         raise HTTPException(status_code=404, detail="Bien introuvable")
@@ -219,7 +226,15 @@ def poser_note(
         raise HTTPException(status_code=400, detail="Note hors barème")
 
     actuelle = next((n.note for n in bien.notes if n.critere == critere_enum), None)
-    noter(session, bien, critere_enum, None if valeur == actuelle else valeur)
+    retenue = None if valeur == actuelle else valeur
+    noter(session, bien, critere_enum, retenue)
+
+    if "application/json" in (request.headers.get("accept") or ""):
+        # Le texte est mis en forme ici et pas dans le navigateur : le formatage
+        # francais des nombres vit a un seul endroit.
+        return JSONResponse(
+            {"critere": critere_enum.value, "note": retenue, **resume_score(score_du_bien(bien))}
+        )
 
     return RedirectResponse(f"/bien/{bien_id}#grille", status_code=303)
 

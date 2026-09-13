@@ -11,7 +11,10 @@
       {% if b.arret_proche %} · {{ b.arret_proche }}, {{ b.minutes_marche }} min à pied{% endif %}
     </p>
   </div>
-  <a class="bouton-compact" href="/bien/{{ b.id }}/modifier">Modifier</a>
+  <div class="actions-fiche">
+    <a class="bouton-compact" href="#grille">Noter</a>
+    <a class="bouton-compact secondaire" href="/bien/{{ b.id }}/modifier">Modifier</a>
+  </div>
 </div>
 
 {# --- Alertes : ce qu'il faut voir avant tout le reste --- #}
@@ -115,22 +118,15 @@
 <section class="bloc" id="grille">
   <h2>
     Notation
-    <span class="score">
-      {% if f.score.pourcentage is none %}
-        non notée
-      {% else %}
-        {{ f.score.obtenu }}/{{ f.score.maximum }} · {{ formate_pourcentage(f.score.pourcentage) }}
-        {% if f.score.verdict %}<em>{{ f.score.verdict.libelle }}</em>{% endif %}
-      {% endif %}
+    <span class="score" data-score>
+      {{ f.resume.texte }}
+      {% if f.resume.verdict %}<em>{{ f.resume.verdict }}</em>{% endif %}
     </span>
   </h2>
 
-  {% if f.score.partielle and f.score.criteres_notes %}
-    <p class="avertissement">
-      Notation partielle : {{ f.score.criteres_notes }} critère(s) sur 11.
-      Le score est calculé sur le maximum des seuls critères renseignés.
-    </p>
-  {% endif %}
+  <p class="avertissement" data-avertissement {{ '' if f.resume.avertissement else 'hidden' }}>
+    {{ f.resume.avertissement or '' }}
+  </p>
 
   <div class="grille">
     {% for critere, libelle, poids, note in f.criteres %}
@@ -141,6 +137,7 @@
         {% for n in range(note_min, note_max + 1) %}
           <button type="submit" name="note" value="{{ n }}"
                   class="bouton-note {{ 'choisi' if note == n }}"
+                  aria-pressed="{{ 'true' if note == n else 'false' }}"
                   aria-label="{{ libelle }} : {{ n }} sur {{ note_max }}">{{ n }}</button>
         {% endfor %}
       </form>
@@ -204,3 +201,5 @@
 </section>
 {% endif %}
 {% endblock %}
+
+{% block scripts %}<script src="/static/grille.js" defer></script>{% endblock %}

@@ -63,6 +63,7 @@ class FicheBien:
     notes: dict[Critere, int]
     lignes_honoraires: list[tuple[str, str, str]]
     prix_cible: str
+    resume: dict
 
     @property
     def criteres(self) -> list[tuple[Critere, str, int, int | None]]:
@@ -106,9 +107,34 @@ def fiche(bien: Bien) -> FicheBien:
             description_brute=bien.description_brute,
         ),
         notes=notes_du_bien(bien),
+        resume=resume_score(score_du_bien(bien)),
         lignes_honoraires=lignes_honoraires,
         prix_cible=formate_euros(prix_cible(region, p)),
     )
+
+
+def resume_score(score: Score) -> dict:
+    """Texte du score et avertissement de notation partielle, deja mis en forme.
+
+    Sert au rendu de la fiche comme a la reponse JSON de la grille, pour que les
+    deux chemins affichent exactement la meme chose.
+    """
+    if score.pourcentage is None:
+        return {"texte": "non notée", "verdict": None, "avertissement": None}
+
+    avertissement = None
+    if score.partielle:
+        avertissement = (
+            f"Notation partielle : {score.criteres_notes} critère(s) sur "
+            f"{len(POIDS)}. Le score est calculé sur le maximum des seuls "
+            "critères renseignés."
+        )
+
+    return {
+        "texte": f"{score.obtenu}/{score.maximum} · {formate_pourcentage(score.pourcentage)}",
+        "verdict": score.verdict.libelle if score.verdict else None,
+        "avertissement": avertissement,
+    }
 
 
 def contexte_commun() -> dict:

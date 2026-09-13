@@ -235,3 +235,48 @@ class TestJournal:
         reponse = client.get("/journal")
         assert reponse.status_code == 200
         assert "jalon 2" in reponse.text
+
+
+class TestNotationSansRechargement:
+    """La grille repond en JSON pour se remplir sans recharger la page."""
+
+    def _taper(self, client, bien, note):
+        return client.post(
+            f"/bien/{bien.id}/note",
+            data={"critere": Critere.GARAGE.value, "note": str(note)},
+            headers={"Accept": "application/json"},
+            follow_redirects=False,
+        )
+
+    def test_reponse_json(self, client, bien):
+        reponse = self._taper(client, bien, 4)
+        assert reponse.status_code == 200
+        assert reponse.json()["note"] == 4
+
+    def test_le_score_est_recalcule_dans_la_meme_requete(self, client, bien):
+        """Regression : la note posee doit etre visible du score immediatement."""
+        assert self._taper(client, bien, 4).json()["texte"].startswith("12/15")
+
+    def test_le_texte_est_deja_mis_en_forme_en_francais(self, client, bien):
+        donnees = self._taper(client, bien, 4).json()
+        assert "80 %" in donnees["texte"].replace(" ", " ")
+        assert donnees["verdict"] == "Offrir vite"
+
+    def test_l_avertissement_de_notation_partielle(self, client, bien):
+        assert "partielle" in self._taper(client, bien, 4).json()["avertissement"]
+
+    def test_retaper_la_meme_note_renvoie_note_nulle(self, client, bien):
+        self._taper(client, bien, 4)
+        donnees = self._taper(client, bien, 4).json()
+        assert donnees["note"] is None
+        assert donnees["texte"] == "non notée"
+        assert donnees["avertissement"] is None
+
+    def test_sans_entete_json_on_redirige_toujours(self, client, bien):
+        """L'amelioration progressive : le formulaire marche sans JavaScript."""
+        reponse = client.post(
+            f"/bien/{bien.id}/note",
+            data={"critere": Critere.GARAGE.value, "note": "4"},
+            follow_redirects=False,
+        )
+        assert reponse.status_code == 303

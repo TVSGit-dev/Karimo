@@ -104,21 +104,22 @@ def noter(
 
     if note is None:
         if existante is not None:
+            # delete-orphan sur la relation : retirer de la collection suffit.
             bien.notes.remove(existante)
-            session.delete(existante)
+            session.flush()
         return
 
     if existante is None:
-        session.add(
-            NoteVisite(
-                bien_id=bien.id, critere=critere, note=note, commentaire=commentaire
-            )
-        )
+        # On passe par la collection, pas par session.add : le score recalcule
+        # dans la meme requete doit voir la note qu'on vient de poser.
+        bien.notes.append(NoteVisite(critere=critere, note=note, commentaire=commentaire))
     else:
         existante.note = note
         existante.date = date.today()
         if commentaire is not None:
             existante.commentaire = commentaire
+
+    session.flush()
 
 
 def lister_journal(session: Session, limite: int = 50) -> list[JournalExecution]:
