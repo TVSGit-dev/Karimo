@@ -15,6 +15,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from enum import StrEnum
 
+from karimo.domain.communes import dans_le_perimetre
 from karimo.domain.peb import AlertePeb, LabelPeb, evaluer_peb
 from karimo.domain.perimetre import MINUTES_SEUIL, dans_perimetre
 from karimo.domain.travaux import IndiceTravaux, detecter_travaux
@@ -65,6 +66,8 @@ def qualifier(
     chambres: int | None,
     surface_habitable: int | None,
     minutes_marche: int | None,
+    commune: str | None = None,
+    code_postal: int | None = None,
     peb_label: LabelPeb | None = None,
     peb_cause: str | None = None,
     description_brute: str | None = None,
@@ -100,11 +103,24 @@ def qualifier(
             Signal(Gravite.EXCLUSION, "surface", f"Moins de {SURFACE_MIN_M2} m² habitables")
         )
 
+    # A l'ingestion automatique on connait la commune mais pas encore les
+    # coordonnees : la commune suffit a ecarter ce qui est clairement hors zone.
+    commune_connue = commune is not None or code_postal is not None
+    if commune_connue and not dans_le_perimetre(commune, code_postal):
+        signaux.append(
+            Signal(
+                Gravite.EXCLUSION,
+                "commune",
+                f"Commune hors périmètre : {commune or code_postal}",
+            )
+        )
+
     match dans_perimetre(minutes_marche):
         case None:
-            signaux.append(
-                Signal(Gravite.ALERTE, "perimetre_inconnu", "Distance à pied non renseignée")
-            )
+            if not commune_connue:
+                signaux.append(
+                    Signal(Gravite.ALERTE, "perimetre_inconnu", "Distance à pied non renseignée")
+                )
         case False:
             signaux.append(
                 Signal(

@@ -11,19 +11,20 @@ faut aller vérifier** (PEB, travaux, périmètre).
 
 ---
 
-## État : jalon 1 livré
+## État : jalons 1 et 2 livrés
 
 | Jalon | Contenu | État |
 |---|---|---|
 | 1 | Modèle de données, règles métier testées, saisie manuelle, calcul financier, grille de notation | **livré** |
-| 2 | Lecture Gmail, un adaptateur de portail, déduplication par libellé | à venir |
+| 2 | Lecture Gmail, un adaptateur de portail, déduplication par libellé | **livré** |
 | 3 | Les trois autres adaptateurs de portails | à venir |
 | 4 | casalina.be, puis les autres sites d'agences | à venir |
 | 5 | Cron et mail récapitulatif | à venir |
 | 6 | Déploiement | à venir |
 
-À ce stade l'application remplace déjà un tableur : on saisit un bien à la main,
-elle calcule le coût réel, signale les alertes et tient la grille de notation.
+À ce stade l'application remplace déjà un tableur et lit les alertes Zimmo
+toute seule : elle calcule le coût réel, signale les alertes, tient la grille de
+notation et journalise chaque exécution.
 
 ## Stack
 
@@ -45,6 +46,16 @@ uv run python -m karimo.seed         # trois biens d'exemple (facultatif)
 uv run uvicorn karimo.web.app:app --reload
 ```
 
+Pour lancer une lecture des mails (jalon 2) :
+
+```bash
+uv run python -m karimo.executer
+```
+
+Au premier lancement, un consentement OAuth s'ouvre dans le navigateur et le
+jeton est écrit dans `KARIMO_GMAIL_TOKEN`. Les exécutions suivantes sont
+silencieuses — c'est ce que le cron du jalon 5 appellera.
+
 L'application écoute sur http://127.0.0.1:8000.
 
 ## Configuration
@@ -61,6 +72,8 @@ secrets ne sont jamais dans le dépôt.
 | `KARIMO_DUREE_ANNEES` | `25` | durée du crédit |
 | `KARIMO_DEBOURS` | `1300` | débours et frais d'acte du notaire |
 | `KARIMO_HONORAIRES_APPROXIMATION` | `0` | `1` pour revenir à l'approximation du SPEC |
+| `KARIMO_GMAIL_CREDENTIALS` | `gmail_credentials.json` | client OAuth Google |
+| `KARIMO_GMAIL_TOKEN` | `gmail_token.json` | jeton obtenu au consentement |
 
 ## Architecture
 
@@ -68,9 +81,11 @@ secrets ne sont jamais dans le dépôt.
 src/karimo/
   domain/      ← les règles métier. Fonctions pures, zéro IO, zéro accès base.
   db/          modèles SQLAlchemy, migrations, accès aux données
+  sources/     lecture Gmail, adaptateurs de portail, orchestration
   web/         routes FastAPI, gabarits Jinja2, CSS
   money.py     montants en centimes entiers, formatage fr-BE
   config.py    seul endroit qui lit l'environnement
+  executer.py  point d'entrée d'une exécution (appelé par le cron au jalon 5)
 ```
 
 `domain/` est isolé et testé exhaustivement : c'est l'exigence transverse du
@@ -78,6 +93,32 @@ SPEC (« le reste peut bouger, pas elles »). Un test d'architecture
 (`tests/domain/test_architecture.py`) lit les imports de chaque module du
 domaine et échoue si l'un d'eux touche la base, le web ou le réseau — pour que
 la frontière ne s'érode pas au jalon 3.
+
+## Lecture des mails (jalon 2)
+
+Une exécution lit les fils Gmail non porteurs du libellé `Suivi-Vus` des
+dernières 48 heures, en extrait les annonces, déduplique par `url_hash`,
+applique les filtres, enregistre ce qui passe, puis applique le libellé — y
+compris quand tout a été écarté. La fenêtre de 48 h est un filet : un fil dont
+le parsing a échoué n'est **pas** libellé, et sera repris au passage suivant.
+
+**Zimmo d'abord, et pas Immoweb.** Le SPEC suppose que les quatre portails
+envoient des mails contenant les annonces. C'est faux pour au moins l'un d'eux :
+l'alerte Immovlan annonce « 37 nouveaux biens » mais ne contient aucune donnée,
+seulement un lien vers le site. L'alerte Zimmo, elle, porte tout : URL, adresse,
+prix, surface et chambres. C'est donc elle qui a été branchée en premier, et le
+parseur est écrit contre un vrai mail conservé en fixture, anonymisé.
+
+Deux pièges relevés sur ce mail réel et couverts par les tests : l'attribut
+`alt` des icônes vaut « Surface » pour les chambres comme pour la surface (on
+lit donc le nom de fichier de l'icône), et les URL portent des paramètres de
+suivi qui changent à chaque envoi — non nettoyés, ils produiraient un doublon
+par jour.
+
+Ce qu'il reste à faire pour les autres portails : Immovlan demandera de visiter
+le site (hors périmètre du SPEC, qui interdit de contourner les protections —
+à rediscuter), Immoweb et Realo n'avaient pas encore envoyé d'alerte au moment
+de l'écriture.
 
 ## Décisions à connaître
 
@@ -103,10 +144,16 @@ coordonnées posées à la main, bonnes à quelques dizaines de mètres près. A
 pour filtrer à 900 m, mais un bien pile sur la limite peut basculer. À reprendre
 sur OpenStreetMap — voir le `TODO` dans `domain/perimetre.py`.
 
-**Filtres d'exclusion consultatifs.** Les filtres du SPEC (prix > 500 000 €,
-moins de 3 chambres, moins de 110 m², hors périmètre) s'affichent en
-avertissement sans bloquer la saisie manuelle. Ils deviennent bloquants au
-jalon 2, sur l'ingestion automatique, qui est leur vraie cible.
+**Filtres d'exclusion : consultatifs à la main, bloquants à l'ingestion.** Les
+filtres du SPEC (prix > 500 000 €, moins de 3 chambres, moins de 110 m², hors
+périmètre) s'affichent en avertissement sans bloquer une saisie manuelle, mais
+écartent bel et bien une annonce lue dans un mail.
+
+**Périmètre par commune à l'ingestion.** Faute de coordonnées au moment de lire
+un mail, le périmètre est vérifié sur la commune, exacte pour les cinq communes
+du SPEC. Le géocodage Nominatim, qui donnera les minutes à pied, reste à faire.
+Un code postal wallon n'est rattaché ni à la Flandre ni à Bruxelles : le bien
+est écarté plutôt que classé de force.
 
 **Ajouts au modèle du SPEC.** `latitude` / `longitude` (sans elles, chaque
 recalcul de périmètre redemanderait le réseau au géocodeur du jalon 2),

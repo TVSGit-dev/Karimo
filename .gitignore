@@ -8,3 +8,7 @@ __pycache__/
 *.egg-info/
 dist/
 build/
+
+# Secrets Gmail : jamais dans le dépôt
+gmail_credentials.json
+gmail_token.json
